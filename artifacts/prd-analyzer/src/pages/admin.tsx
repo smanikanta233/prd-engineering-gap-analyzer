@@ -8,12 +8,11 @@ import {
   getGetAnalysesSummaryQueryKey,
   getListAnalysesQueryKey,
 } from "@workspace/api-client-react";
-import { ArrowLeft, Loader2, Trash2, ExternalLink, Search } from "lucide-react";
+import { ArrowLeft, Loader2, Trash2, ExternalLink, Search, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 
 const SEVERITY_COLORS: Record<string, string> = {
   critical: "bg-destructive",
@@ -33,6 +32,7 @@ export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
+  const [loadedAt] = useState(() => new Date());
 
   const { data: summary, isLoading: isSummaryLoading } = useGetAnalysesSummary({
     query: { queryKey: getGetAnalysesSummaryQueryKey() },
@@ -225,16 +225,24 @@ export default function AdminDashboard() {
 
           {/* All analyses table */}
           <Card className="bg-card">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between flex-wrap gap-2">
               <CardTitle className="text-sm font-mono">ALL_ANALYSES</CardTitle>
-              <div className="relative w-56">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Filter by title..."
-                  className="pl-8 h-7 text-xs font-mono"
-                />
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" asChild className="h-7 text-xs font-mono">
+                  <Link href="/history">
+                    <History className="w-3.5 h-3.5 mr-1.5" />
+                    View History
+                  </Link>
+                </Button>
+                <div className="relative w-48">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Filter by title..."
+                    className="pl-8 h-7 text-xs font-mono"
+                  />
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -258,8 +266,13 @@ export default function AdminDashboard() {
                     <tbody>
                       {filteredAnalyses.map((analysis) => (
                         <tr key={analysis.id} className="border-b border-border/50">
-                          <td className="py-2 text-foreground max-w-[200px] truncate">
-                            {analysis.title}
+                          <td className="py-2 max-w-[200px] truncate">
+                            <Link
+                              href={`/analyses/${analysis.id}`}
+                              className="text-primary hover:underline"
+                            >
+                              {analysis.title}
+                            </Link>
                           </td>
                           <td className="py-2 text-right text-muted-foreground">
                             {new Date(analysis.createdAt).toLocaleDateString()}
@@ -302,6 +315,11 @@ export default function AdminDashboard() {
               )}
             </CardContent>
           </Card>
+
+          {/* Last updated timestamp */}
+          <p className="text-xs text-muted-foreground font-mono text-right pb-2">
+            Dashboard data as of {loadedAt.toLocaleString()}
+          </p>
         </>
       )}
     </div>

@@ -5,6 +5,7 @@ import { useState, useMemo } from "react";
 import {
   ArrowLeft, Loader2, ThumbsUp, ThumbsDown, Trash2, AlertTriangle,
   Shield, Zap, Database, CheckCircle2, ChevronRight, Activity, Download,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,16 @@ type SeverityFilter = "all" | "critical" | "high" | "medium" | "low";
 type SortMode = "severity" | "confidence";
 
 const SEVERITY_ORDER: Record<string, number> = { critical: 1, high: 2, medium: 3, low: 4 };
+
+function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 60);
+}
 
 export default function AnalysisDetail() {
   const { id } = useParams<{ id: string }>();
@@ -36,7 +47,7 @@ export default function AnalysisDetail() {
   });
 
   const deleteAnalysis = useDeleteAnalysis({
-    mutation: { onSuccess: () => setLocation("/") },
+    mutation: { onSuccess: () => setLocation("/history") },
   });
 
   const submitFeedback = useSubmitGapFeedback({
@@ -91,7 +102,8 @@ export default function AnalysisDetail() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `prd-gaps-${analysis.id}.json`;
+    const titleSlug = analysis.title ? slugify(analysis.title) : `analysis-${analysis.id}`;
+    a.download = `${titleSlug}-gaps.json`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -128,7 +140,7 @@ export default function AnalysisDetail() {
       <div className="text-center py-12">
         <h2 className="text-xl font-bold text-destructive mb-2">Analysis Not Found</h2>
         <Button variant="outline" asChild>
-          <Link href="/">Return Home</Link>
+          <Link href="/history">Back to History</Link>
         </Button>
       </div>
     );
@@ -140,9 +152,19 @@ export default function AnalysisDetail() {
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
           <Button variant="ghost" size="icon" asChild className="h-8 w-8 mt-0.5 shrink-0">
-            <Link href="/"><ArrowLeft className="w-4 h-4" /></Link>
+            <Link href="/history"><ArrowLeft className="w-4 h-4" /></Link>
           </Button>
           <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono mb-0.5">
+              <Link href="/history" className="hover:text-foreground transition-colors flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                History
+              </Link>
+              <span className="text-border">/</span>
+              <span className="text-foreground truncate max-w-[200px]">
+                {analysis.title || `Analysis #${analysis.id}`}
+              </span>
+            </div>
             <h1 className="text-2xl font-bold tracking-tight leading-tight">
               {analysis.title || `Analysis #${analysis.id}`}
             </h1>
@@ -168,7 +190,7 @@ export default function AnalysisDetail() {
             variant="destructive"
             size="sm"
             onClick={() => {
-              if (confirm("Delete this analysis?")) {
+              if (confirm("Delete this analysis? This cannot be undone.")) {
                 deleteAnalysis.mutate({ id: analysis.id });
               }
             }}
@@ -183,7 +205,7 @@ export default function AnalysisDetail() {
       {/* Split view */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start flex-1">
         {/* Left: original PRD */}
-        <Card className="bg-card/50 flex flex-col" style={{ height: "calc(100vh - 13rem)" }}>
+        <Card className="bg-card/50 flex flex-col" style={{ height: "calc(100vh - 15rem)" }}>
           <CardHeader className="py-2.5 px-4 border-b border-border bg-muted/20">
             <CardTitle className="text-xs font-mono flex items-center gap-2 text-muted-foreground">
               <ChevronRight className="w-3.5 h-3.5" />
@@ -200,8 +222,8 @@ export default function AnalysisDetail() {
         </Card>
 
         {/* Right: gaps panel */}
-        <div className="flex flex-col" style={{ height: "calc(100vh - 13rem)" }}>
-          {/* Severity summary card */}
+        <div className="flex flex-col" style={{ height: "calc(100vh - 15rem)" }}>
+          {/* Severity summary cards */}
           <div className="grid grid-cols-4 gap-2 mb-3">
             {(["critical", "high", "medium", "low"] as const).map((sev) => (
               <button

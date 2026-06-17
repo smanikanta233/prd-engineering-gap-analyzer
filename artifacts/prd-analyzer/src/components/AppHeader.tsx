@@ -7,6 +7,7 @@ export default function AppHeader() {
 
   const navLinks = [
     { href: "/", label: "Analyzer" },
+    { href: "/history", label: "History" },
     { href: "/admin", label: "Admin" },
   ];
 

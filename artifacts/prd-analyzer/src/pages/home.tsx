@@ -3,7 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { Play, ArrowRight, Activity, AlertTriangle, Loader2, Cpu } from "lucide-react";
+import { Play, ArrowRight, Activity, Loader2, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -16,7 +16,6 @@ import {
   getListAnalysesQueryKey,
   getGetAnalysesSummaryQueryKey,
 } from "@workspace/api-client-react";
-import { Badge } from "@/components/ui/badge";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 const formSchema = z.object({
@@ -30,6 +29,12 @@ const SEVERITY_COLORS: Record<string, string> = {
   medium: "#eab308",
   low: "#3b82f6",
 };
+
+function getBorderColor(criticalCount: number, highCount: number) {
+  if (criticalCount > 0) return "border-l-destructive";
+  if (highCount > 0) return "border-l-orange-500";
+  return "border-l-green-500";
+}
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -67,6 +72,8 @@ export default function Home() {
     count: b.count,
     fill: SEVERITY_COLORS[b.severity] ?? "#6b7280",
   })) ?? [];
+
+  const recentAnalyses = analyses?.slice(0, 5) ?? [];
 
   return (
     <div className="space-y-8">
@@ -161,57 +168,67 @@ export default function Home() {
 
           {/* Recent analyses */}
           <div className="space-y-4 pt-4">
-            <h2 className="text-lg font-bold tracking-tight border-b border-border pb-2">
-              Recent Analyses
-            </h2>
+            <div className="flex items-center justify-between border-b border-border pb-2">
+              <h2 className="text-lg font-bold tracking-tight">Recent Analyses</h2>
+              {analyses && analyses.length > 0 && (
+                <Link
+                  href="/history"
+                  className="text-xs text-primary hover:underline font-mono flex items-center gap-1"
+                >
+                  View all in History
+                  <ArrowRight className="w-3 h-3" />
+                </Link>
+              )}
+            </div>
             {isAnalysesLoading ? (
               <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Loading history...
               </div>
-            ) : analyses && analyses.length > 0 ? (
+            ) : recentAnalyses.length > 0 ? (
               <div className="grid grid-cols-1 gap-3">
-                {analyses.map((analysis) => (
-                  <Link key={analysis.id} href={`/analyses/${analysis.id}`}>
-                    <Card className="hover:border-primary/50 transition-colors cursor-pointer bg-card/50">
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="font-medium text-sm truncate max-w-[70%]">
-                            {analysis.title || `Analysis #${analysis.id}`}
-                          </span>
-                          <span className="text-xs text-muted-foreground font-mono shrink-0 ml-2">
-                            {new Date(analysis.createdAt).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {analysis.criticalCount > 0 && (
-                            <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20 text-[10px] px-1.5 font-mono uppercase">
-                              {analysis.criticalCount} critical
-                            </Badge>
-                          )}
-                          {analysis.highCount > 0 && (
-                            <Badge variant="outline" className="bg-orange-500/10 text-orange-500 border-orange-500/20 text-[10px] px-1.5 font-mono uppercase">
-                              {analysis.highCount} high
-                            </Badge>
-                          )}
-                          {analysis.mediumCount > 0 && (
-                            <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20 text-[10px] px-1.5 font-mono uppercase">
-                              {analysis.mediumCount} med
-                            </Badge>
-                          )}
-                          {analysis.lowCount > 0 && (
-                            <Badge variant="outline" className="bg-blue-500/10 text-blue-500 border-blue-500/20 text-[10px] px-1.5 font-mono uppercase">
-                              {analysis.lowCount} low
-                            </Badge>
-                          )}
-                          <span className="text-xs text-muted-foreground font-mono ml-auto flex items-center gap-1">
-                            {analysis.gapCount} gaps
-                            <ArrowRight className="w-3 h-3" />
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
+                {recentAnalyses.map((analysis) => (
+                  <div
+                    key={analysis.id}
+                    className={`rounded-lg border border-border bg-card/50 border-l-4 ${getBorderColor(analysis.criticalCount, analysis.highCount)} hover:border-primary/40 transition-colors`}
+                  >
+                    <div className="p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="font-medium text-sm truncate max-w-[70%]">
+                          {analysis.title || `Analysis #${analysis.id}`}
+                        </span>
+                        <span className="text-xs text-muted-foreground font-mono shrink-0 ml-2">
+                          {new Date(analysis.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap mb-2">
+                        <span className="text-[11px] font-mono text-destructive bg-destructive/10 border border-destructive/20 rounded px-1.5 py-0.5">
+                          🔴 {analysis.criticalCount} critical
+                        </span>
+                        <span className="text-[11px] font-mono text-orange-500 bg-orange-500/10 border border-orange-500/20 rounded px-1.5 py-0.5">
+                          🟠 {analysis.highCount} high
+                        </span>
+                        <span className="text-[11px] font-mono text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 rounded px-1.5 py-0.5">
+                          🟡 {analysis.mediumCount} med
+                        </span>
+                        <span className="text-[11px] font-mono text-blue-500 bg-blue-500/10 border border-blue-500/20 rounded px-1.5 py-0.5">
+                          🔵 {analysis.lowCount} low
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {analysis.gapCount} total gaps
+                        </span>
+                        <Link
+                          href={`/analyses/${analysis.id}`}
+                          className="text-xs text-primary hover:underline font-mono flex items-center gap-1"
+                        >
+                          View Analysis
+                          <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             ) : (

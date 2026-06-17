@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import AnalysisDetail from "@/pages/analysis";
 import AdminDashboard from "@/pages/admin";
+import HistoryPage from "@/pages/history";
 import AppHeader from "@/components/AppHeader";
 
 const queryClient = new QueryClient({
@@ -32,6 +33,7 @@ function Router() {
       <main className="flex-1 container mx-auto px-4 py-8">
         <Switch>
           <Route path="/" component={Home} />
+          <Route path="/history" component={HistoryPage} />
           <Route path="/analyses/:id" component={AnalysisDetail} />
           <Route path="/admin" component={AdminDashboard} />
           <Route component={NotFound} />
