@@ -23,14 +23,43 @@ router.get("/analyses/summary", async (_req, res): Promise<void> => {
     .from(analysesTable)
     .leftJoin(gapsTable, eq(gapsTable.analysisId, analysesTable.id));
 
-  const gapTypeBreakdown = await db
+  const totalFeedbackRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(feedbackTable);
+  const totalFeedback = totalFeedbackRows[0]?.count ?? 0;
+
+  // Gap type breakdown with avg confidence and most common severity
+  const gapTypeRaw = await db
     .select({
       gapType: gapsTable.gapType,
       count: sql<number>`count(*)::int`,
+      avgConfidence: sql<number>`avg(${gapsTable.confidence})`,
     })
     .from(gapsTable)
     .groupBy(gapsTable.gapType)
     .orderBy(sql`count(*) desc`);
+
+  const gapTypeBreakdown = await Promise.all(
+    gapTypeRaw.map(async (row) => {
+      const severityRows = await db
+        .select({
+          severity: gapsTable.severity,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(gapsTable)
+        .where(eq(gapsTable.gapType, row.gapType))
+        .groupBy(gapsTable.severity)
+        .orderBy(sql`count(*) desc`)
+        .limit(1);
+
+      return {
+        gapType: row.gapType,
+        count: row.count,
+        avgConfidence: Math.round(Number(row.avgConfidence) * 100) / 100,
+        mostCommonSeverity: severityRows[0]?.severity ?? "low",
+      };
+    })
+  );
 
   const severityBreakdown = await db
     .select({
@@ -41,6 +70,39 @@ router.get("/analyses/summary", async (_req, res): Promise<void> => {
     .groupBy(gapsTable.severity)
     .orderBy(sql`count(*) desc`);
 
+  // Feedback summary by gap type
+  const feedbackRaw = await db
+    .select({
+      gapType: gapsTable.gapType,
+      isHelpful: feedbackTable.isHelpful,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(feedbackTable)
+    .innerJoin(gapsTable, eq(feedbackTable.gapId, gapsTable.id))
+    .groupBy(gapsTable.gapType, feedbackTable.isHelpful);
+
+  const feedbackByType: Record<string, { helpful: number; notHelpful: number }> = {};
+  for (const row of feedbackRaw) {
+    if (!feedbackByType[row.gapType]) {
+      feedbackByType[row.gapType] = { helpful: 0, notHelpful: 0 };
+    }
+    if (row.isHelpful === 1) {
+      feedbackByType[row.gapType].helpful += row.count;
+    } else {
+      feedbackByType[row.gapType].notHelpful += row.count;
+    }
+  }
+
+  const feedbackSummary = Object.entries(feedbackByType).map(([gapType, counts]) => {
+    const total = counts.helpful + counts.notHelpful;
+    return {
+      gapType,
+      helpfulCount: counts.helpful,
+      notHelpfulCount: counts.notHelpful,
+      helpfulnessRate: total > 0 ? Math.round((counts.helpful / total) * 100) / 100 : 0,
+    };
+  });
+
   const avgGapsPerAnalysis =
     totals.totalAnalyses > 0 ? totals.totalGaps / totals.totalAnalyses : 0;
 
@@ -49,13 +111,18 @@ router.get("/analyses/summary", async (_req, res): Promise<void> => {
     totalGaps: totals.totalGaps,
     avgGapsPerAnalysis: Math.round(avgGapsPerAnalysis * 10) / 10,
     avgConfidence: Math.round(Number(totals.avgConfidence) * 100) / 100,
+    totalFeedback,
     gapTypeBreakdown,
     severityBreakdown,
+    feedbackSummary,
   });
 });
 
 router.get("/analyses", async (_req, res): Promise<void> => {
-  const analyses = await db.select().from(analysesTable).orderBy(sql`${analysesTable.createdAt} desc`);
+  const analyses = await db
+    .select()
+    .from(analysesTable)
+    .orderBy(sql`${analysesTable.createdAt} desc`);
 
   const result = await Promise.all(
     analyses.map(async (analysis) => {
@@ -92,7 +159,7 @@ router.post("/analyses", async (req, res): Promise<void> => {
     return;
   }
 
-  const { prdText } = parsed.data;
+  const { prdText, title: userTitle } = parsed.data;
 
   let analysisResult;
   try {
@@ -103,9 +170,14 @@ router.post("/analyses", async (req, res): Promise<void> => {
     return;
   }
 
+  // Use user-provided title; fall back to AI-generated title
+  const title = (userTitle && userTitle.trim().length >= 3)
+    ? userTitle.trim()
+    : analysisResult.title;
+
   const [analysis] = await db
     .insert(analysesTable)
-    .values({ prdText, title: analysisResult.title })
+    .values({ prdText, title })
     .returning();
 
   const gapsToInsert = analysisResult.gaps.map((gap) => ({
@@ -116,11 +188,12 @@ router.post("/analyses", async (req, res): Promise<void> => {
     confidence: gap.confidence,
   }));
 
-  const insertedGaps = gapsToInsert.length > 0
-    ? await db.insert(gapsTable).values(gapsToInsert).returning()
-    : [];
+  const insertedGaps =
+    gapsToInsert.length > 0
+      ? await db.insert(gapsTable).values(gapsToInsert).returning()
+      : [];
 
-  const gapsWithFeedback = insertedGaps.map((gap: typeof insertedGaps[0]) => ({
+  const gapsWithFeedback = insertedGaps.map((gap) => ({
     ...gap,
     createdAt: gap.createdAt.toISOString(),
     helpfulCount: 0,

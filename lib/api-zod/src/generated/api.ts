@@ -9,16 +9,26 @@ import * as zod from 'zod';
 
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
-  "status": zod.string()
+  "status": zod.string(),
+  "message": zod.string(),
+  "timestamp": zod.string()
 })
 
 
 /**
- * Returns all PRD analyses with gap counts
+ * @summary Health check (alternate path)
+ */
+export const HealthCheckAltResponse = zod.object({
+  "status": zod.string(),
+  "message": zod.string(),
+  "timestamp": zod.string()
+})
+
+
+/**
  * @summary List all analyses
  */
 export const ListAnalysesResponseItem = zod.object({
@@ -36,20 +46,21 @@ export const ListAnalysesResponse = zod.array(ListAnalysesResponseItem)
 
 
 /**
- * Submit PRD text for AI-powered gap analysis
  * @summary Create a new PRD analysis
  */
 export const createAnalysisBodyPrdTextMin = 50;
 
+export const createAnalysisBodyTitleMin = 3;
+
 
 
 export const CreateAnalysisBody = zod.object({
-  "prdText": zod.string().min(createAnalysisBodyPrdTextMin)
+  "prdText": zod.string().min(createAnalysisBodyPrdTextMin),
+  "title": zod.string().min(createAnalysisBodyTitleMin)
 })
 
 
 /**
- * Returns totals, gap type breakdown, severity breakdown
  * @summary Get aggregate summary stats
  */
 export const GetAnalysesSummaryResponse = zod.object({
@@ -57,13 +68,22 @@ export const GetAnalysesSummaryResponse = zod.object({
   "totalGaps": zod.number(),
   "avgGapsPerAnalysis": zod.number(),
   "avgConfidence": zod.number(),
+  "totalFeedback": zod.number(),
   "gapTypeBreakdown": zod.array(zod.object({
   "gapType": zod.string(),
-  "count": zod.number()
+  "count": zod.number(),
+  "avgConfidence": zod.number(),
+  "mostCommonSeverity": zod.string()
 })),
   "severityBreakdown": zod.array(zod.object({
   "severity": zod.string(),
   "count": zod.number()
+})),
+  "feedbackSummary": zod.array(zod.object({
+  "gapType": zod.string(),
+  "helpfulCount": zod.number(),
+  "notHelpfulCount": zod.number(),
+  "helpfulnessRate": zod.number()
 }))
 })
 

@@ -6,8 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
-  message: string;
-  timestamp: string;
+export interface FeedbackSummaryItem {
+  gapType: string;
+  helpfulCount: number;
+  notHelpfulCount: number;
+  helpfulnessRate: number;
 }

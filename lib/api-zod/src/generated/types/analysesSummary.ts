@@ -5,6 +5,7 @@
  * PRD Engineering Gap Analyzer API
  * OpenAPI spec version: 0.1.0
  */
+import type { FeedbackSummaryItem } from './feedbackSummaryItem';
 import type { GapTypeBreakdown } from './gapTypeBreakdown';
 import type { SeverityBreakdown } from './severityBreakdown';
 
@@ -13,6 +14,8 @@ export interface AnalysesSummary {
   totalGaps: number;
   avgGapsPerAnalysis: number;
   avgConfidence: number;
+  totalFeedback: number;
   gapTypeBreakdown: GapTypeBreakdown[];
   severityBreakdown: SeverityBreakdown[];
+  feedbackSummary: FeedbackSummaryItem[];
 }

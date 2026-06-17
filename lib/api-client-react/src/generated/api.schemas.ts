@@ -7,6 +7,8 @@
  */
 export interface HealthStatus {
   status: string;
+  message: string;
+  timestamp: string;
 }
 
 export interface Gap {
@@ -44,11 +46,15 @@ export interface AnalysisSummary {
 export interface AnalysisInput {
   /** @minLength 50 */
   prdText: string;
+  /** @minLength 3 */
+  title: string;
 }
 
 export interface GapTypeBreakdown {
   gapType: string;
   count: number;
+  avgConfidence: number;
+  mostCommonSeverity: string;
 }
 
 export interface SeverityBreakdown {
@@ -56,13 +62,22 @@ export interface SeverityBreakdown {
   count: number;
 }
 
+export interface FeedbackSummaryItem {
+  gapType: string;
+  helpfulCount: number;
+  notHelpfulCount: number;
+  helpfulnessRate: number;
+}
+
 export interface AnalysesSummary {
   totalAnalyses: number;
   totalGaps: number;
   avgGapsPerAnalysis: number;
   avgConfidence: number;
+  totalFeedback: number;
   gapTypeBreakdown: GapTypeBreakdown[];
   severityBreakdown: SeverityBreakdown[];
+  feedbackSummary: FeedbackSummaryItem[];
 }
 
 export interface FeedbackInput {

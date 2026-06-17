@@ -50,7 +50,6 @@ export const getHealthCheckUrl = () => {
 }
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const healthCheck = async ( options?: RequestInit): Promise<HealthStatus> => {
@@ -119,6 +118,83 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
+export const getHealthCheckAltUrl = () => {
+
+
+
+
+  return `/api/health`
+}
+
+/**
+ * @summary Health check (alternate path)
+ */
+export const healthCheckAlt = async ( options?: RequestInit): Promise<HealthStatus> => {
+
+  return customFetch<HealthStatus>(getHealthCheckAltUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getHealthCheckAltQueryKey = () => {
+    return [
+    `/api/health`
+    ] as const;
+    }
+
+
+export const getHealthCheckAltQueryOptions = <TData = Awaited<ReturnType<typeof healthCheckAlt>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheckAlt>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getHealthCheckAltQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheckAlt>>> = ({ signal }) => healthCheckAlt({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof healthCheckAlt>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type HealthCheckAltQueryResult = NonNullable<Awaited<ReturnType<typeof healthCheckAlt>>>
+export type HealthCheckAltQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Health check (alternate path)
+ */
+
+export function useHealthCheckAlt<TData = Awaited<ReturnType<typeof healthCheckAlt>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheckAlt>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getHealthCheckAltQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getListAnalysesUrl = () => {
 
 
@@ -128,7 +204,6 @@ export const getListAnalysesUrl = () => {
 }
 
 /**
- * Returns all PRD analyses with gap counts
  * @summary List all analyses
  */
 export const listAnalyses = async ( options?: RequestInit): Promise<AnalysisSummary[]> => {
@@ -206,7 +281,6 @@ export const getCreateAnalysisUrl = () => {
 }
 
 /**
- * Submit PRD text for AI-powered gap analysis
  * @summary Create a new PRD analysis
  */
 export const createAnalysis = async (analysisInput: AnalysisInput, options?: RequestInit): Promise<Analysis> => {
@@ -278,7 +352,6 @@ export const getGetAnalysesSummaryUrl = () => {
 }
 
 /**
- * Returns totals, gap type breakdown, severity breakdown
  * @summary Get aggregate summary stats
  */
 export const getAnalysesSummary = async ( options?: RequestInit): Promise<AnalysesSummary> => {

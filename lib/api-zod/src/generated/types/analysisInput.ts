@@ -9,4 +9,6 @@
 export interface AnalysisInput {
   /** @minLength 50 */
   prdText: string;
+  /** @minLength 3 */
+  title: string;
 }

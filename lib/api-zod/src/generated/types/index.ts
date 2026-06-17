@@ -12,6 +12,7 @@ export * from './analysisInput';
 export * from './analysisSummary';
 export * from './feedback';
 export * from './feedbackInput';
+export * from './feedbackSummaryItem';
 export * from './gap';
 export * from './gapTypeBreakdown';
 export * from './healthStatus';

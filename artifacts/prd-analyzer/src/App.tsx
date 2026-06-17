@@ -6,6 +6,8 @@ import { useEffect } from "react";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import AnalysisDetail from "@/pages/analysis";
+import AdminDashboard from "@/pages/admin";
+import AppHeader from "@/components/AppHeader";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -26,20 +28,12 @@ function ThemeProvider({ children }: { children: React.ReactNode }) {
 function Router() {
   return (
     <div className="min-h-screen flex flex-col w-full">
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 h-14 flex items-center">
-          <div className="flex items-center gap-2 font-mono font-bold text-sm text-foreground">
-            <div className="w-4 h-4 bg-primary rounded-sm flex items-center justify-center">
-              <div className="w-1.5 h-1.5 bg-primary-foreground rounded-full"></div>
-            </div>
-            PRD_GAP_ANALYZER
-          </div>
-        </div>
-      </header>
+      <AppHeader />
       <main className="flex-1 container mx-auto px-4 py-8">
         <Switch>
           <Route path="/" component={Home} />
           <Route path="/analyses/:id" component={AnalysisDetail} />
+          <Route path="/admin" component={AdminDashboard} />
           <Route component={NotFound} />
         </Switch>
       </main>

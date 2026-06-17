@@ -9,4 +9,6 @@
 export interface GapTypeBreakdown {
   gapType: string;
   count: number;
+  avgConfidence: number;
+  mostCommonSeverity: string;
 }

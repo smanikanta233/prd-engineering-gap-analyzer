@@ -20,7 +20,19 @@ paths:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /health:
+    get:
+      operationId: healthCheckAlt
+      tags: [health]
+      summary: Health check (alternate path)
       responses:
         "200":
           description: Healthy
@@ -34,7 +46,6 @@ paths:
       operationId: listAnalyses
       tags: [analyses]
       summary: List all analyses
-      description: Returns all PRD analyses with gap counts
       responses:
         "200":
           description: List of analyses
@@ -48,7 +59,6 @@ paths:
       operationId: createAnalysis
       tags: [analyses]
       summary: Create a new PRD analysis
-      description: Submit PRD text for AI-powered gap analysis
       requestBody:
         required: true
         content:
@@ -70,7 +80,6 @@ paths:
       operationId: getAnalysesSummary
       tags: [analyses]
       summary: Get aggregate summary stats
-      description: Returns totals, gap type breakdown, severity breakdown
       responses:
         "200":
           description: Summary stats
@@ -146,11 +155,14 @@ components:
   schemas:
     HealthStatus:
       type: object
+      required: [status, message, timestamp]
       properties:
         status:
           type: string
-      required:
-        - status
+        message:
+          type: string
+        timestamp:
+          type: string
 
     Gap:
       type: object
@@ -217,20 +229,27 @@ components:
 
     AnalysisInput:
       type: object
-      required: [prdText]
+      required: [prdText, title]
       properties:
         prdText:
           type: string
           minLength: 50
+        title:
+          type: string
+          minLength: 3
 
     GapTypeBreakdown:
       type: object
-      required: [gapType, count]
+      required: [gapType, count, avgConfidence, mostCommonSeverity]
       properties:
         gapType:
           type: string
         count:
           type: integer
+        avgConfidence:
+          type: number
+        mostCommonSeverity:
+          type: string
 
     SeverityBreakdown:
       type: object
@@ -241,9 +260,22 @@ components:
         count:
           type: integer
 
+    FeedbackSummaryItem:
+      type: object
+      required: [gapType, helpfulCount, notHelpfulCount, helpfulnessRate]
+      properties:
+        gapType:
+          type: string
+        helpfulCount:
+          type: integer
+        notHelpfulCount:
+          type: integer
+        helpfulnessRate:
+          type: number
+
     AnalysesSummary:
       type: object
-      required: [totalAnalyses, totalGaps, avgGapsPerAnalysis, avgConfidence, gapTypeBreakdown, severityBreakdown]
+      required: [totalAnalyses, totalGaps, avgGapsPerAnalysis, avgConfidence, totalFeedback, gapTypeBreakdown, severityBreakdown, feedbackSummary]
       properties:
         totalAnalyses:
           type: integer
@@ -253,6 +285,8 @@ components:
           type: number
         avgConfidence:
           type: number
+        totalFeedback:
+          type: integer
         gapTypeBreakdown:
           type: array
           items:
@@ -261,6 +295,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/SeverityBreakdown"
+        feedbackSummary:
+          type: array
+          items:
+            $ref: "#/components/schemas/FeedbackSummaryItem"
 
     FeedbackInput:
       type: object
