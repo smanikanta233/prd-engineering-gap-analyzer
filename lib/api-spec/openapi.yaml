@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: PRD Engineering Gap Analyzer API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: analyses
+    description: PRD analysis operations
+  - name: gaps
+    description: Gap feedback operations
 paths:
   /healthz:
     get:
@@ -24,6 +28,120 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /analyses:
+    get:
+      operationId: listAnalyses
+      tags: [analyses]
+      summary: List all analyses
+      description: Returns all PRD analyses with gap counts
+      responses:
+        "200":
+          description: List of analyses
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AnalysisSummary"
+    post:
+      operationId: createAnalysis
+      tags: [analyses]
+      summary: Create a new PRD analysis
+      description: Submit PRD text for AI-powered gap analysis
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalysisInput"
+      responses:
+        "201":
+          description: Analysis created with gaps
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Analysis"
+        "400":
+          description: Invalid input
+
+  /analyses/summary:
+    get:
+      operationId: getAnalysesSummary
+      tags: [analyses]
+      summary: Get aggregate summary stats
+      description: Returns totals, gap type breakdown, severity breakdown
+      responses:
+        "200":
+          description: Summary stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysesSummary"
+
+  /analyses/{id}:
+    get:
+      operationId: getAnalysis
+      tags: [analyses]
+      summary: Get a single analysis with all gaps
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Analysis with gaps
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Analysis"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteAnalysis
+      tags: [analyses]
+      summary: Delete an analysis
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /gaps/{id}/feedback:
+    post:
+      operationId: submitGapFeedback
+      tags: [gaps]
+      summary: Submit feedback for a gap
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackInput"
+      responses:
+        "201":
+          description: Feedback recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Feedback"
+        "404":
+          description: Gap not found
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +152,132 @@ components:
       required:
         - status
 
+    Gap:
+      type: object
+      required: [id, analysisId, gapType, description, severity, confidence, createdAt, helpfulCount, notHelpfulCount]
+      properties:
+        id:
+          type: integer
+        analysisId:
+          type: integer
+        gapType:
+          type: string
+        description:
+          type: string
+        severity:
+          type: string
+        confidence:
+          type: number
+        createdAt:
+          type: string
+        helpfulCount:
+          type: integer
+        notHelpfulCount:
+          type: integer
+
+    Analysis:
+      type: object
+      required: [id, prdText, title, createdAt, gaps]
+      properties:
+        id:
+          type: integer
+        prdText:
+          type: string
+        title:
+          type: string
+        createdAt:
+          type: string
+        gaps:
+          type: array
+          items:
+            $ref: "#/components/schemas/Gap"
+
+    AnalysisSummary:
+      type: object
+      required: [id, title, prdText, createdAt, gapCount, criticalCount, highCount, mediumCount, lowCount]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        prdText:
+          type: string
+        createdAt:
+          type: string
+        gapCount:
+          type: integer
+        criticalCount:
+          type: integer
+        highCount:
+          type: integer
+        mediumCount:
+          type: integer
+        lowCount:
+          type: integer
+
+    AnalysisInput:
+      type: object
+      required: [prdText]
+      properties:
+        prdText:
+          type: string
+          minLength: 50
+
+    GapTypeBreakdown:
+      type: object
+      required: [gapType, count]
+      properties:
+        gapType:
+          type: string
+        count:
+          type: integer
+
+    SeverityBreakdown:
+      type: object
+      required: [severity, count]
+      properties:
+        severity:
+          type: string
+        count:
+          type: integer
+
+    AnalysesSummary:
+      type: object
+      required: [totalAnalyses, totalGaps, avgGapsPerAnalysis, avgConfidence, gapTypeBreakdown, severityBreakdown]
+      properties:
+        totalAnalyses:
+          type: integer
+        totalGaps:
+          type: integer
+        avgGapsPerAnalysis:
+          type: number
+        avgConfidence:
+          type: number
+        gapTypeBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/GapTypeBreakdown"
+        severityBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/SeverityBreakdown"
+
+    FeedbackInput:
+      type: object
+      required: [isHelpful]
+      properties:
+        isHelpful:
+          type: boolean
+
+    Feedback:
+      type: object
+      required: [id, gapId, isHelpful, createdAt]
+      properties:
+        id:
+          type: integer
+        gapId:
+          type: integer
+        isHelpful:
+          type: boolean
+        createdAt:
+          type: string
