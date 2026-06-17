@@ -92,11 +92,18 @@ export default function Home() {
     createAnalysis.mutate({ data: { prdText: values.prdText, title: values.title } });
   }
 
-  const chartData = summary?.severityBreakdown?.map((b) => ({
-    name: b.severity.charAt(0).toUpperCase() + b.severity.slice(1),
-    count: b.count,
-    fill: SEVERITY_COLORS[b.severity] ?? "#6b7280",
-  })) ?? [];
+  const SEVERITY_CHART_ORDER = ["critical", "high", "medium", "low"];
+  const chartData = [...(summary?.severityBreakdown ?? [])]
+    .sort(
+      (a, b) =>
+        SEVERITY_CHART_ORDER.indexOf(a.severity) -
+        SEVERITY_CHART_ORDER.indexOf(b.severity)
+    )
+    .map((b) => ({
+      name: b.severity.charAt(0).toUpperCase() + b.severity.slice(1),
+      count: b.count,
+      fill: SEVERITY_COLORS[b.severity] ?? "#6b7280",
+    }));
 
   const recentAnalyses = analyses?.slice(0, 5) ?? [];
 

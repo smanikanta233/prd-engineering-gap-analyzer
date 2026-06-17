@@ -21,6 +21,31 @@ import {
 type SeverityFilter = "all" | "critical" | "high" | "clean";
 type SortMode = "newest" | "oldest" | "most_gaps" | "fewest_gaps";
 
+function SeverityCountBadge({ severity, count }: { severity: string; count: number }) {
+  const styles: Record<string, { bg: string; text: string; border: string }> = {
+    critical: { bg: "#FCEBEB", text: "#791F1F", border: "#F09595" },
+    high:     { bg: "#FAEEDA", text: "#633806", border: "#EF9F27" },
+    medium:   { bg: "#E6F1FB", text: "#0C447C", border: "#85B7EB" },
+    low:      { bg: "#EAF3DE", text: "#27500A", border: "#97C459" },
+  };
+  const s = styles[severity] ?? { bg: "#F3F4F6", text: "#374151", border: "#D1D5DB" };
+  const label = severity.charAt(0).toUpperCase() + severity.slice(1);
+  return (
+    <span style={{
+      background: s.bg,
+      color: s.text,
+      border: `1px solid ${s.border}`,
+      fontSize: 12,
+      fontWeight: 500,
+      padding: "3px 10px",
+      borderRadius: 20,
+      whiteSpace: "nowrap",
+    }}>
+      ● {count} {label}
+    </span>
+  );
+}
+
 export default function HistoryPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
@@ -74,10 +99,10 @@ export default function HistoryPage() {
     return list;
   }, [analyses, search, severityFilter, sortMode]);
 
-  function getBorderColor(criticalCount: number, highCount: number) {
-    if (criticalCount > 0) return "border-l-destructive";
-    if (highCount > 0) return "border-l-orange-500";
-    return "border-l-green-500";
+  function getBorderColor(criticalCount: number, highCount: number): string {
+    if (criticalCount > 0) return "#E24B4A";
+    if (highCount > 0) return "#EF9F27";
+    return "#3B6D11";
   }
 
   const total = analyses?.length ?? 0;
@@ -112,11 +137,11 @@ export default function HistoryPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by title..."
-            className="pl-8 font-mono text-sm bg-card"
+            className="pl-8 text-sm bg-card"
           />
         </div>
         <Select value={severityFilter} onValueChange={(v) => setSeverityFilter(v as SeverityFilter)}>
-          <SelectTrigger className="w-full sm:w-44 font-mono text-sm">
+          <SelectTrigger className="w-full sm:w-44 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -127,7 +152,7 @@ export default function HistoryPage() {
           </SelectContent>
         </Select>
         <Select value={sortMode} onValueChange={(v) => setSortMode(v as SortMode)}>
-          <SelectTrigger className="w-full sm:w-44 font-mono text-sm">
+          <SelectTrigger className="w-full sm:w-44 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -141,7 +166,7 @@ export default function HistoryPage() {
 
       {/* Results count */}
       {!isLoading && analyses && analyses.length > 0 && (
-        <p className="text-xs text-muted-foreground font-mono -mt-2">
+        <p className="text-xs text-muted-foreground -mt-2">
           Showing {filtered.length} of {total} {total === 1 ? "analysis" : "analyses"}
         </p>
       )}
@@ -150,10 +175,9 @@ export default function HistoryPage() {
       {isLoading ? (
         <div className="flex items-center gap-2 text-muted-foreground py-12 justify-center">
           <Loader2 className="h-5 w-5 animate-spin" />
-          <span className="text-sm font-mono">Loading analyses...</span>
+          <span className="text-sm">Loading analyses...</span>
         </div>
       ) : filtered.length === 0 && total === 0 ? (
-        /* Empty state */
         <div className="flex flex-col items-center justify-center py-20 text-center gap-4">
           <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
             <History className="w-8 h-8 text-muted-foreground opacity-50" />
@@ -177,65 +201,61 @@ export default function HistoryPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((analysis) => (
-            <div
-              key={analysis.id}
-              className={`rounded-lg border border-border bg-card border-l-4 ${getBorderColor(analysis.criticalCount, analysis.highCount)} transition-colors hover:border-primary/40`}
-            >
-              <div className="p-4">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <span className="font-semibold text-sm leading-snug flex-1 min-w-0">
-                    {analysis.title || `Analysis #${analysis.id}`}
-                  </span>
-                  <span className="text-xs text-muted-foreground font-mono shrink-0">
-                    {new Date(analysis.createdAt).toLocaleDateString()}
-                  </span>
-                </div>
+          {filtered.map((analysis) => {
+            const borderColor = getBorderColor(analysis.criticalCount, analysis.highCount);
+            return (
+              <div
+                key={analysis.id}
+                className="rounded-lg border border-border bg-card transition-colors hover:border-primary/40"
+                style={{ borderLeft: `4px solid ${borderColor}` }}
+              >
+                <div className="p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <span style={{ fontSize: 15, fontWeight: 500 }} className="leading-snug flex-1 min-w-0">
+                      {analysis.title || `Analysis #${analysis.id}`}
+                    </span>
+                    <span style={{ fontSize: 13 }} className="text-muted-foreground shrink-0">
+                      {new Date(analysis.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
 
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  <span className="text-[11px] font-mono text-destructive bg-destructive/10 border border-destructive/20 rounded px-1.5 py-0.5">
-                    🔴 Critical: {analysis.criticalCount}
-                  </span>
-                  <span className="text-[11px] font-mono text-orange-500 bg-orange-500/10 border border-orange-500/20 rounded px-1.5 py-0.5">
-                    🟠 High: {analysis.highCount}
-                  </span>
-                  <span className="text-[11px] font-mono text-yellow-500 bg-yellow-500/10 border border-yellow-500/20 rounded px-1.5 py-0.5">
-                    🟡 Medium: {analysis.mediumCount}
-                  </span>
-                  <span className="text-[11px] font-mono text-blue-500 bg-blue-500/10 border border-blue-500/20 rounded px-1.5 py-0.5">
-                    🔵 Low: {analysis.lowCount}
-                  </span>
-                </div>
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    <SeverityCountBadge severity="critical" count={analysis.criticalCount} />
+                    <SeverityCountBadge severity="high" count={analysis.highCount} />
+                    <SeverityCountBadge severity="medium" count={analysis.mediumCount} />
+                    <SeverityCountBadge severity="low" count={analysis.lowCount} />
+                  </div>
 
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {analysis.gapCount} total gaps
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    <Button asChild size="sm" variant="outline" className="h-7 text-xs font-mono">
-                      <Link href={`/analyses/${analysis.id}`}>
-                        View Analysis
-                        <ArrowRight className="w-3 h-3 ml-1" />
-                      </Link>
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                      disabled={deleteAnalysis.isPending}
-                      onClick={() => {
-                        if (confirm(`Delete "${analysis.title}"? This cannot be undone.`)) {
-                          deleteAnalysis.mutate({ id: analysis.id });
-                        }
-                      }}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+                  <div className="flex items-center justify-between gap-2">
+                    <span style={{ fontSize: 13 }} className="text-muted-foreground">
+                      {analysis.gapCount} total gaps
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <Button asChild size="sm" className="h-7 text-xs">
+                        <Link href={`/analyses/${analysis.id}`}>
+                          View Analysis
+                          <ArrowRight className="w-3 h-3 ml-1" />
+                        </Link>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                        disabled={deleteAnalysis.isPending}
+                        onClick={() => {
+                          if (confirm(`Delete "${analysis.title}"? This cannot be undone.`)) {
+                            deleteAnalysis.mutate({ id: analysis.id });
+                          }
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
