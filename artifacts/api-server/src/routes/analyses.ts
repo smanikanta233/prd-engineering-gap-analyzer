@@ -8,11 +8,38 @@ import {
   SubmitGapFeedbackParams,
   SubmitGapFeedbackBody,
 } from "@workspace/api-zod";
-import { analyzePrd } from "../lib/openai";
-import { logger } from "../lib/logger";
+import { analyzePrd } from "../lib/openai.js";
+import { logger } from "../lib/logger.js";
+import { runLogicEngine } from "../services/logic-engine/index.js";
 
 const router: IRouter = Router();
 
+// ── GET /api/engine-test ────────────────────────────────────────────────────
+// Tests the deterministic logic engine with a deliberately weak sample PRD.
+// No DB writes, no OpenAI — pure engine output for verification.
+const SAMPLE_PRD = `## Background
+We need to build a user authentication system for our platform.
+
+## Goals
+The system should be fast, user-friendly and scalable.
+
+## Requirements
+- Users can login with email and password
+- The system should send notifications
+- Upload profile pictures
+- Search for other users
+- Admin can manage users etc.
+
+## Out of Scope
+- Social login (maybe later)
+`;
+
+router.get("/engine-test", async (_req, res): Promise<void> => {
+  const report = await runLogicEngine(SAMPLE_PRD);
+  res.json(report);
+});
+
+// ── GET /api/analyses/summary ───────────────────────────────────────────────
 router.get("/analyses/summary", async (_req, res): Promise<void> => {
   const [totals] = await db
     .select({
@@ -28,7 +55,6 @@ router.get("/analyses/summary", async (_req, res): Promise<void> => {
     .from(feedbackTable);
   const totalFeedback = totalFeedbackRows[0]?.count ?? 0;
 
-  // Gap type breakdown with avg confidence and most common severity
   const gapTypeRaw = await db
     .select({
       gapType: gapsTable.gapType,
@@ -70,7 +96,6 @@ router.get("/analyses/summary", async (_req, res): Promise<void> => {
     .groupBy(gapsTable.severity)
     .orderBy(sql`count(*) desc`);
 
-  // Feedback summary by gap type
   const feedbackRaw = await db
     .select({
       gapType: gapsTable.gapType,
@@ -118,6 +143,7 @@ router.get("/analyses/summary", async (_req, res): Promise<void> => {
   });
 });
 
+// ── GET /api/analyses ───────────────────────────────────────────────────────
 router.get("/analyses", async (_req, res): Promise<void> => {
   const analyses = await db
     .select()
@@ -152,6 +178,7 @@ router.get("/analyses", async (_req, res): Promise<void> => {
   res.json(result);
 });
 
+// ── POST /api/analyses ──────────────────────────────────────────────────────
 router.post("/analyses", async (req, res): Promise<void> => {
   const parsed = CreateAnalysisBody.safeParse(req.body);
   if (!parsed.success) {
@@ -160,6 +187,9 @@ router.post("/analyses", async (req, res): Promise<void> => {
   }
 
   const { prdText, title: userTitle } = parsed.data;
+
+  // Run the deterministic logic engine first
+  const engineReport = await runLogicEngine(prdText);
 
   let analysisResult;
   try {
@@ -170,14 +200,13 @@ router.post("/analyses", async (req, res): Promise<void> => {
     return;
   }
 
-  // Use user-provided title; fall back to AI-generated title
   const title = (userTitle && userTitle.trim().length >= 3)
     ? userTitle.trim()
     : analysisResult.title;
 
   const [analysis] = await db
     .insert(analysesTable)
-    .values({ prdText, title })
+    .values({ prdText, title, engineReport: JSON.stringify(engineReport) })
     .returning();
 
   const gapsToInsert = analysisResult.gaps.map((gap) => ({
@@ -203,10 +232,12 @@ router.post("/analyses", async (req, res): Promise<void> => {
   res.status(201).json({
     ...analysis,
     createdAt: analysis.createdAt.toISOString(),
+    engineReport,
     gaps: gapsWithFeedback,
   });
 });
 
+// ── GET /api/analyses/:id ───────────────────────────────────────────────────
 router.get("/analyses/:id", async (req, res): Promise<void> => {
   const params = GetAnalysisParams.safeParse(req.params);
   if (!params.success) {
@@ -248,13 +279,19 @@ router.get("/analyses/:id", async (req, res): Promise<void> => {
     })
   );
 
+  const parsedEngineReport = analysis.engineReport
+    ? JSON.parse(analysis.engineReport)
+    : null;
+
   res.json({
     ...analysis,
     createdAt: analysis.createdAt.toISOString(),
+    engineReport: parsedEngineReport,
     gaps: gapsWithFeedback,
   });
 });
 
+// ── DELETE /api/analyses/:id ────────────────────────────────────────────────
 router.delete("/analyses/:id", async (req, res): Promise<void> => {
   const params = DeleteAnalysisParams.safeParse(req.params);
   if (!params.success) {
@@ -275,6 +312,7 @@ router.delete("/analyses/:id", async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
+// ── POST /api/gaps/:id/feedback ─────────────────────────────────────────────
 router.post("/gaps/:id/feedback", async (req, res): Promise<void> => {
   const params = SubmitGapFeedbackParams.safeParse(req.params);
   if (!params.success) {

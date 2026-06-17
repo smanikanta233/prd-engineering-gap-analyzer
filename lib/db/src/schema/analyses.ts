@@ -6,6 +6,7 @@ export const analysesTable = pgTable("analyses", {
   id: serial("id").primaryKey(),
   prdText: text("prd_text").notNull(),
   title: text("title").notNull().default("Untitled PRD"),
+  engineReport: text("engine_report"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
