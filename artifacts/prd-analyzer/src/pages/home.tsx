@@ -3,7 +3,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation, Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
-import { Play, ArrowRight, Activity, Loader2, Cpu } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Play, ArrowRight, Activity, Loader2, Cpu, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -30,6 +31,13 @@ const SEVERITY_COLORS: Record<string, string> = {
   low: "#3b82f6",
 };
 
+const PIPELINE_STEPS = [
+  { label: "Running logic engine", sublabel: "Structural analysis", delay: 0 },
+  { label: "Detecting ambiguities", sublabel: "Pattern matching", delay: 900 },
+  { label: "Sending to GPT-4o", sublabel: "AI semantic analysis", delay: 2000 },
+  { label: "Merging findings", sublabel: "Deduplication & ranking", delay: 0 },
+];
+
 function getBorderColor(criticalCount: number, highCount: number) {
   if (criticalCount > 0) return "border-l-destructive";
   if (highCount > 0) return "border-l-orange-500";
@@ -39,6 +47,7 @@ function getBorderColor(criticalCount: number, highCount: number) {
 export default function Home() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const [loadingStep, setLoadingStep] = useState(0);
 
   const { data: analyses, isLoading: isAnalysesLoading } = useListAnalyses({
     query: { queryKey: getListAnalysesQueryKey() },
@@ -51,12 +60,28 @@ export default function Home() {
   const createAnalysis = useCreateAnalysis({
     mutation: {
       onSuccess: (data) => {
+        setLoadingStep(3);
         queryClient.invalidateQueries({ queryKey: getListAnalysesQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetAnalysesSummaryQueryKey() });
         setLocation(`/analyses/${data.id}`);
       },
     },
   });
+
+  // Advance loading steps while pending
+  useEffect(() => {
+    if (!createAnalysis.isPending) {
+      setLoadingStep(0);
+      return;
+    }
+    setLoadingStep(0);
+    const t1 = setTimeout(() => setLoadingStep(1), PIPELINE_STEPS[1].delay);
+    const t2 = setTimeout(() => setLoadingStep(2), PIPELINE_STEPS[2].delay);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [createAnalysis.isPending]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -154,7 +179,7 @@ export default function Home() {
                 {createAnalysis.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Analyzing (this takes a few seconds)...
+                    Analyzing...
                   </>
                 ) : (
                   <>
@@ -163,6 +188,62 @@ export default function Home() {
                   </>
                 )}
               </Button>
+
+              {/* Multi-step loading indicator */}
+              {createAnalysis.isPending && (
+                <div className="rounded-lg border border-border bg-card/60 p-4 space-y-2.5">
+                  <div className="text-[10px] font-mono uppercase text-muted-foreground tracking-wider mb-3">
+                    Analysis Pipeline
+                  </div>
+                  {PIPELINE_STEPS.map((step, i) => {
+                    const isDone = i < loadingStep;
+                    const isActive = i === loadingStep;
+                    const isPending = i > loadingStep;
+                    return (
+                      <div
+                        key={i}
+                        className={`flex items-center gap-3 transition-opacity duration-300 ${
+                          isPending ? "opacity-30" : "opacity-100"
+                        }`}
+                      >
+                        <div
+                          className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] font-mono border ${
+                            isDone
+                              ? "bg-green-500/20 border-green-500/40 text-green-500"
+                              : isActive
+                              ? "bg-primary/20 border-primary/40 text-primary"
+                              : "bg-muted border-border text-muted-foreground"
+                          }`}
+                        >
+                          {isDone ? (
+                            <Check className="w-3 h-3" />
+                          ) : isActive ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <span>{i + 1}</span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div
+                            className={`text-xs font-medium ${
+                              isDone
+                                ? "text-green-500"
+                                : isActive
+                                ? "text-foreground"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {step.label}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground font-mono">
+                            {step.sublabel}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </form>
           </Form>
 

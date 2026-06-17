@@ -7,6 +7,7 @@ export const analysesTable = pgTable("analyses", {
   prdText: text("prd_text").notNull(),
   title: text("title").notNull().default("Untitled PRD"),
   engineReport: text("engine_report"),
+  aiSummary: text("ai_summary"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -21,6 +22,8 @@ export const gapsTable = pgTable("gaps", {
   description: text("description").notNull(),
   severity: text("severity").notNull(), // critical | high | medium | low
   confidence: real("confidence").notNull().default(0),
+  source: text("source").notNull().default("logic-engine"), // 'logic-engine' | 'ai'
+  recommendation: text("recommendation"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

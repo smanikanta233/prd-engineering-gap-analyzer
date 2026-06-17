@@ -100,6 +100,41 @@ export const GetAnalysisResponse = zod.object({
   "prdText": zod.string(),
   "title": zod.string(),
   "createdAt": zod.string(),
+  "aiSummary": zod.string().nullish(),
+  "engineReport": zod.object({
+  "confidence": zod.object({
+  "structureScore": zod.number(),
+  "clarityScore": zod.number(),
+  "completenessScore": zod.number(),
+  "totalScore": zod.number(),
+  "grade": zod.string(),
+  "interpretation": zod.string()
+}),
+  "sections": zod.object({
+  "totalDetected": zod.number(),
+  "totalExpected": zod.number(),
+  "completenessPercent": zod.number(),
+  "missingSections": zod.array(zod.string()),
+  "problemStatement": zod.boolean(),
+  "goal": zod.boolean(),
+  "scope": zod.boolean(),
+  "acceptanceCriteria": zod.boolean(),
+  "assumptions": zod.boolean(),
+  "edgeCases": zod.boolean(),
+  "dependencies": zod.boolean(),
+  "errorHandling": zod.boolean()
+}),
+  "summary": zod.object({
+  "totalIssuesFound": zod.number(),
+  "criticalCount": zod.number(),
+  "highCount": zod.number(),
+  "mediumCount": zod.number(),
+  "lowCount": zod.number(),
+  "topIssues": zod.array(zod.string()),
+  "readinessLabel": zod.string()
+}),
+  "processingTimeMs": zod.number()
+}).nullish(),
   "gaps": zod.array(zod.object({
   "id": zod.number(),
   "analysisId": zod.number(),
@@ -107,6 +142,8 @@ export const GetAnalysisResponse = zod.object({
   "description": zod.string(),
   "severity": zod.string(),
   "confidence": zod.number(),
+  "source": zod.string().optional(),
+  "recommendation": zod.string().nullish(),
   "createdAt": zod.string(),
   "helpfulCount": zod.number(),
   "notHelpfulCount": zod.number()

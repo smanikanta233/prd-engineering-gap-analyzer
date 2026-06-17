@@ -164,6 +164,88 @@ components:
         timestamp:
           type: string
 
+    EngineConfidence:
+      type: object
+      required: [structureScore, clarityScore, completenessScore, totalScore, grade, interpretation]
+      properties:
+        structureScore:
+          type: number
+        clarityScore:
+          type: number
+        completenessScore:
+          type: number
+        totalScore:
+          type: number
+        grade:
+          type: string
+        interpretation:
+          type: string
+
+    EngineSections:
+      type: object
+      required: [totalDetected, totalExpected, completenessPercent, missingSections, problemStatement, goal, scope, acceptanceCriteria, assumptions, edgeCases, dependencies, errorHandling]
+      properties:
+        totalDetected:
+          type: integer
+        totalExpected:
+          type: integer
+        completenessPercent:
+          type: number
+        missingSections:
+          type: array
+          items:
+            type: string
+        problemStatement:
+          type: boolean
+        goal:
+          type: boolean
+        scope:
+          type: boolean
+        acceptanceCriteria:
+          type: boolean
+        assumptions:
+          type: boolean
+        edgeCases:
+          type: boolean
+        dependencies:
+          type: boolean
+        errorHandling:
+          type: boolean
+
+    EngineSummary:
+      type: object
+      required: [totalIssuesFound, criticalCount, highCount, mediumCount, lowCount, topIssues, readinessLabel]
+      properties:
+        totalIssuesFound:
+          type: integer
+        criticalCount:
+          type: integer
+        highCount:
+          type: integer
+        mediumCount:
+          type: integer
+        lowCount:
+          type: integer
+        topIssues:
+          type: array
+          items:
+            type: string
+        readinessLabel:
+          type: string
+
+    EngineReport:
+      type: object
+      required: [confidence, sections, summary, processingTimeMs]
+      properties:
+        confidence:
+          $ref: "#/components/schemas/EngineConfidence"
+        sections:
+          $ref: "#/components/schemas/EngineSections"
+        summary:
+          $ref: "#/components/schemas/EngineSummary"
+        processingTimeMs:
+          type: number
+
     Gap:
       type: object
       required: [id, analysisId, gapType, description, severity, confidence, createdAt, helpfulCount, notHelpfulCount]
@@ -180,6 +262,11 @@ components:
           type: string
         confidence:
           type: number
+        source:
+          type: string
+        recommendation:
+          type: string
+          nullable: true
         createdAt:
           type: string
         helpfulCount:
@@ -199,6 +286,12 @@ components:
           type: string
         createdAt:
           type: string
+        aiSummary:
+          type: string
+          nullable: true
+        engineReport:
+          $ref: "#/components/schemas/EngineReport"
+          nullable: true
         gaps:
           type: array
           items:

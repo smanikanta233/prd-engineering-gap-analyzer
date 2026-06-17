@@ -13,6 +13,8 @@ export interface Gap {
   description: string;
   severity: string;
   confidence: number;
+  source?: string;
+  recommendation?: string | null;
   createdAt: string;
   helpfulCount: number;
   notHelpfulCount: number;

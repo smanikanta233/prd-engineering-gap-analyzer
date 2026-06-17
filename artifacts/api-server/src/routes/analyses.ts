@@ -8,15 +8,14 @@ import {
   SubmitGapFeedbackParams,
   SubmitGapFeedbackBody,
 } from "@workspace/api-zod";
-import { analyzePrd } from "../lib/openai.js";
 import { logger } from "../lib/logger.js";
 import { runLogicEngine } from "../services/logic-engine/index.js";
+import { analyzeWithAI } from "../services/openai/prdAnalyzer.js";
+import { mergeGaps } from "../services/gapMerger.js";
 
 const router: IRouter = Router();
 
-// ── GET /api/engine-test ────────────────────────────────────────────────────
-// Tests the deterministic logic engine with a deliberately weak sample PRD.
-// No DB writes, no OpenAI — pure engine output for verification.
+// ── Sample PRD for test endpoints ───────────────────────────────────────────
 const SAMPLE_PRD = `## Background
 We need to build a user authentication system for our platform.
 
@@ -34,12 +33,48 @@ The system should be fast, user-friendly and scalable.
 - Social login (maybe later)
 `;
 
+// ── GET /api/engine-test ─────────────────────────────────────────────────────
+// Tests the deterministic logic engine only — no DB writes, no OpenAI.
 router.get("/engine-test", async (_req, res): Promise<void> => {
   const report = await runLogicEngine(SAMPLE_PRD);
   res.json(report);
 });
 
-// ── GET /api/analyses/summary ───────────────────────────────────────────────
+// ── GET /api/engine-test-full ────────────────────────────────────────────────
+// Runs the COMPLETE pipeline (logic engine + AI + merge) on the sample PRD.
+// Verifies end-to-end flow without using the frontend. No DB writes.
+router.get("/engine-test-full", async (_req, res): Promise<void> => {
+  const engineReport = await runLogicEngine(SAMPLE_PRD);
+
+  let aiResult = { gaps: [] as Awaited<ReturnType<typeof analyzeWithAI>>["gaps"], aiSummary: "" };
+  try {
+    aiResult = await analyzeWithAI(SAMPLE_PRD, engineReport);
+  } catch (err) {
+    logger.warn({ err }, "OpenAI unavailable in engine-test-full — returning logic engine only");
+  }
+
+  const mergedGaps = mergeGaps(engineReport, aiResult.gaps);
+
+  res.json({
+    engineReport: {
+      confidence: engineReport.confidence,
+      sections: engineReport.sections,
+      summary: engineReport.summary,
+      processingTimeMs: engineReport.processingTimeMs,
+    },
+    aiSummary: aiResult.aiSummary,
+    gaps: mergedGaps,
+    totalGaps: mergedGaps.length,
+    criticalCount: mergedGaps.filter((g) => g.severity === "critical").length,
+    highCount: mergedGaps.filter((g) => g.severity === "high").length,
+    mediumCount: mergedGaps.filter((g) => g.severity === "medium").length,
+    lowCount: mergedGaps.filter((g) => g.severity === "low").length,
+    aiGapCount: mergedGaps.filter((g) => g.source === "ai").length,
+    logicEngineGapCount: mergedGaps.filter((g) => g.source === "logic-engine").length,
+  });
+});
+
+// ── GET /api/analyses/summary ────────────────────────────────────────────────
 router.get("/analyses/summary", async (_req, res): Promise<void> => {
   const [totals] = await db
     .select({
@@ -143,7 +178,7 @@ router.get("/analyses/summary", async (_req, res): Promise<void> => {
   });
 });
 
-// ── GET /api/analyses ───────────────────────────────────────────────────────
+// ── GET /api/analyses ────────────────────────────────────────────────────────
 router.get("/analyses", async (_req, res): Promise<void> => {
   const analyses = await db
     .select()
@@ -157,20 +192,14 @@ router.get("/analyses", async (_req, res): Promise<void> => {
         .from(gapsTable)
         .where(eq(gapsTable.analysisId, analysis.id));
 
-      const gapCount = gaps.length;
-      const criticalCount = gaps.filter((g) => g.severity === "critical").length;
-      const highCount = gaps.filter((g) => g.severity === "high").length;
-      const mediumCount = gaps.filter((g) => g.severity === "medium").length;
-      const lowCount = gaps.filter((g) => g.severity === "low").length;
-
       return {
         ...analysis,
         createdAt: analysis.createdAt.toISOString(),
-        gapCount,
-        criticalCount,
-        highCount,
-        mediumCount,
-        lowCount,
+        gapCount: gaps.length,
+        criticalCount: gaps.filter((g) => g.severity === "critical").length,
+        highCount: gaps.filter((g) => g.severity === "high").length,
+        mediumCount: gaps.filter((g) => g.severity === "medium").length,
+        lowCount: gaps.filter((g) => g.severity === "low").length,
       };
     })
   );
@@ -178,7 +207,8 @@ router.get("/analyses", async (_req, res): Promise<void> => {
   res.json(result);
 });
 
-// ── POST /api/analyses ──────────────────────────────────────────────────────
+// ── POST /api/analyses ───────────────────────────────────────────────────────
+// Full pipeline: Logic Engine → GPT-4o → Merge → Store → Return
 router.post("/analyses", async (req, res): Promise<void> => {
   const parsed = CreateAnalysisBody.safeParse(req.body);
   if (!parsed.success) {
@@ -186,40 +216,50 @@ router.post("/analyses", async (req, res): Promise<void> => {
     return;
   }
 
-  const { prdText, title: userTitle } = parsed.data;
+  const { prdText, title } = parsed.data;
 
-  // Run the deterministic logic engine first
+  // STEP 1: Run deterministic Logic Engine (~10ms, no API cost)
   const engineReport = await runLogicEngine(prdText);
 
-  let analysisResult;
+  // STEP 2: Send enriched context to GPT-4o (graceful degradation on failure)
+  let aiResult = { gaps: [] as Awaited<ReturnType<typeof analyzeWithAI>>["gaps"], aiSummary: "" };
   try {
-    analysisResult = await analyzePrd(prdText);
+    aiResult = await analyzeWithAI(prdText, engineReport);
   } catch (err) {
-    logger.error({ err }, "OpenAI analysis failed");
-    res.status(500).json({ error: "Failed to analyze PRD. Please try again." });
-    return;
+    logger.warn({ err }, "OpenAI analysis failed — using logic engine results only");
   }
 
-  const title = (userTitle && userTitle.trim().length >= 3)
-    ? userTitle.trim()
-    : analysisResult.title;
+  // STEP 3: Merge and deduplicate all gaps
+  const mergedGaps = mergeGaps(engineReport, aiResult.gaps);
 
+  // STEP 4: Store analysis in DB
   const [analysis] = await db
     .insert(analysesTable)
-    .values({ prdText, title, engineReport: JSON.stringify(engineReport) })
+    .values({
+      prdText: prdText.trim(),
+      title: title.trim(),
+      engineReport: JSON.stringify(engineReport),
+      aiSummary: aiResult.aiSummary || null,
+    })
     .returning();
 
-  const gapsToInsert = analysisResult.gaps.map((gap) => ({
-    analysisId: analysis.id,
-    gapType: gap.gapType,
-    description: gap.description,
-    severity: gap.severity,
-    confidence: gap.confidence,
-  }));
-
+  // STEP 5: Store all gaps
   const insertedGaps =
-    gapsToInsert.length > 0
-      ? await db.insert(gapsTable).values(gapsToInsert).returning()
+    mergedGaps.length > 0
+      ? await db
+          .insert(gapsTable)
+          .values(
+            mergedGaps.map((g) => ({
+              analysisId: analysis.id,
+              gapType: g.gapType,
+              description: g.description,
+              severity: g.severity,
+              confidence: g.confidence,
+              source: g.source,
+              recommendation: g.recommendation,
+            }))
+          )
+          .returning()
       : [];
 
   const gapsWithFeedback = insertedGaps.map((gap) => ({
@@ -229,15 +269,22 @@ router.post("/analyses", async (req, res): Promise<void> => {
     notHelpfulCount: 0,
   }));
 
+  // STEP 6: Return full result
   res.status(201).json({
     ...analysis,
     createdAt: analysis.createdAt.toISOString(),
-    engineReport,
+    engineReport: {
+      confidence: engineReport.confidence,
+      sections: engineReport.sections,
+      summary: engineReport.summary,
+      processingTimeMs: engineReport.processingTimeMs,
+    },
+    aiSummary: aiResult.aiSummary || null,
     gaps: gapsWithFeedback,
   });
 });
 
-// ── GET /api/analyses/:id ───────────────────────────────────────────────────
+// ── GET /api/analyses/:id ────────────────────────────────────────────────────
 router.get("/analyses/:id", async (req, res): Promise<void> => {
   const params = GetAnalysisParams.safeParse(req.params);
   if (!params.success) {
@@ -287,11 +334,12 @@ router.get("/analyses/:id", async (req, res): Promise<void> => {
     ...analysis,
     createdAt: analysis.createdAt.toISOString(),
     engineReport: parsedEngineReport,
+    aiSummary: analysis.aiSummary ?? null,
     gaps: gapsWithFeedback,
   });
 });
 
-// ── DELETE /api/analyses/:id ────────────────────────────────────────────────
+// ── DELETE /api/analyses/:id ─────────────────────────────────────────────────
 router.delete("/analyses/:id", async (req, res): Promise<void> => {
   const params = DeleteAnalysisParams.safeParse(req.params);
   if (!params.success) {
@@ -312,7 +360,7 @@ router.delete("/analyses/:id", async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
-// ── POST /api/gaps/:id/feedback ─────────────────────────────────────────────
+// ── POST /api/gaps/:id/feedback ──────────────────────────────────────────────
 router.post("/gaps/:id/feedback", async (req, res): Promise<void> => {
   const params = SubmitGapFeedbackParams.safeParse(req.params);
   if (!params.success) {

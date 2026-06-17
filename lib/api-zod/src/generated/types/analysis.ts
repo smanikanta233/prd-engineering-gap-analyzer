@@ -5,6 +5,7 @@
  * PRD Engineering Gap Analyzer API
  * OpenAPI spec version: 0.1.0
  */
+import type { EngineReport } from './engineReport';
 import type { Gap } from './gap';
 
 export interface Analysis {
@@ -12,5 +13,7 @@ export interface Analysis {
   prdText: string;
   title: string;
   createdAt: string;
+  aiSummary?: string | null;
+  engineReport?: EngineReport | null;
   gaps: Gap[];
 }

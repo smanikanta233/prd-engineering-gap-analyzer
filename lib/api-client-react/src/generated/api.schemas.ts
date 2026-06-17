@@ -11,6 +11,47 @@ export interface HealthStatus {
   timestamp: string;
 }
 
+export interface EngineConfidence {
+  structureScore: number;
+  clarityScore: number;
+  completenessScore: number;
+  totalScore: number;
+  grade: string;
+  interpretation: string;
+}
+
+export interface EngineSections {
+  totalDetected: number;
+  totalExpected: number;
+  completenessPercent: number;
+  missingSections: string[];
+  problemStatement: boolean;
+  goal: boolean;
+  scope: boolean;
+  acceptanceCriteria: boolean;
+  assumptions: boolean;
+  edgeCases: boolean;
+  dependencies: boolean;
+  errorHandling: boolean;
+}
+
+export interface EngineSummary {
+  totalIssuesFound: number;
+  criticalCount: number;
+  highCount: number;
+  mediumCount: number;
+  lowCount: number;
+  topIssues: string[];
+  readinessLabel: string;
+}
+
+export interface EngineReport {
+  confidence: EngineConfidence;
+  sections: EngineSections;
+  summary: EngineSummary;
+  processingTimeMs: number;
+}
+
 export interface Gap {
   id: number;
   analysisId: number;
@@ -18,6 +59,8 @@ export interface Gap {
   description: string;
   severity: string;
   confidence: number;
+  source?: string;
+  recommendation?: string | null;
   createdAt: string;
   helpfulCount: number;
   notHelpfulCount: number;
@@ -28,6 +71,8 @@ export interface Analysis {
   prdText: string;
   title: string;
   createdAt: string;
+  aiSummary?: string | null;
+  engineReport?: EngineReport | null;
   gaps: Gap[];
 }
 
