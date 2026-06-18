@@ -25,8 +25,8 @@ echo "Setting up GitHub remote..."
 git remote remove origin 2>/dev/null || true
 git remote add origin "$REPO_URL"
 
-echo "Pushing all commits to GitHub..."
-git push -u origin main
+echo "Pushing all commits to GitHub (force push)..."
+git push -u origin main --force
 
 if [ $? -eq 0 ]; then
   echo ""
